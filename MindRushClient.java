@@ -15,7 +15,7 @@ import java.net.*;
  *
  * @author andysstuff
  */
-public class HW3Client {
+public class MindRushClient {
 
     private static final int SERVER_PORT = 5190;
     private BufferedReader in;
@@ -30,7 +30,7 @@ public class HW3Client {
         inputText.setText("");
     }
     
-    public HW3Client(String serverAddr, String username) throws IOException {
+    public MindRushClient(String serverAddr, String username) throws IOException {
         // Network setup to server
         Socket socket = new Socket(serverAddr, SERVER_PORT);
         //Sets up client socket to commuincate with server
