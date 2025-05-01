@@ -10,7 +10,9 @@ public class MindRushServer {
     private static final HashMap<String, String[]> quizMap = new HashMap<>();
     private static List<Integer> questionIndexes;
     private static boolean startPlay = false;
+    private static boolean playing = false;
     private static List<String> questionKeys;
+    private static String current_question;
 
 
     public static void main(String[] args) throws IOException {
@@ -111,12 +113,18 @@ public class MindRushServer {
             handler.start();
             if (startPlay) {
                 startPlay = false;
+                playing = true;
                 Thread countdownThread = new Thread(() -> {
                     try {
                         for (int i = 0; i < 5; i++) {
-                            broadcast("QUESTION:" + questionKeys.get(questionIndexes.get(i)));
+                            current_question = questionKeys.get(questionIndexes.get(i));
+                            broadcast("QUESTION:" + current_question + ";" + String.join(";", quizMap.get(current_question)));
                             Thread.sleep(30000);
                         }
+                        for (ClientHandler client : clients) {
+                            broadcast(client.getScore());
+                        }
+                        playing = false;
                     }
                     catch (InterruptedException e) {
                         System.out.println("Countdown interrupted");
@@ -140,6 +148,8 @@ public class MindRushServer {
         private Socket socket;
         private Scanner in;
         private PrintStream out;
+        private String username;
+        private int correct;
 
         public ClientHandler(Socket socket) {
             this.socket = socket;
@@ -152,10 +162,14 @@ public class MindRushServer {
 
                 String message;
 
+                correct = 0;
+
+                username = in.nextLine();
+
                 Random random = new Random();
                 
                 while (in.hasNextLine()) {
-                    if (!startPlay) {
+                    if (!playing) {
                         message = in.nextLine();
                         if (message.equals("START_CLICKED")) {
                             // Set questions for this quiz
@@ -166,6 +180,11 @@ public class MindRushServer {
                             startPlay = true;
                         }
                     }
+                    else { // If the input is an answer being given
+                        if (correctAnswers.get(current_question) == Integer.parseInt(in.nextLine())) {
+                            correct++;
+                        }
+                    }
                 }
             } catch (IOException e) {
                 // failed
@@ -174,6 +193,10 @@ public class MindRushServer {
                     socket.close();
                 } catch (IOException e) {}
             }
-        }        
+        }
+
+        public String getScore() {
+            return (username + correct);
+        }
     }
 }
