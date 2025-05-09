@@ -11,7 +11,7 @@ public class MindRushServer {
     private static List<Integer> questionIndexes;
     private static boolean startPlay = false;
     private static boolean playing = false;
-    private static List<String> questionKeys;
+    private static List<String> questionKeys = new ArrayList<>();
     private static String current_question;
 
     public static void main(String[] args) throws IOException {
@@ -110,6 +110,11 @@ public class MindRushServer {
         correctAnswers.put("What is the capital of Egypt?", 0);
         correctAnswers.put("What is the largest organ in the human body?", 2);
         correctAnswers.put("What is the capital of India?", 2);
+        
+        for (String question : quizMap.keySet()) {
+            questionKeys.add(question);
+        }
+        
     }
 
     private static void broadcast(String message) {
