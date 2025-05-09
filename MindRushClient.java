@@ -1,87 +1,105 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Main.java to edit this template
- */
-
-package hw3client;
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.io.*;
 import java.net.*;
 
-/**
- *
- * @author andysstuff
- */
 public class MindRushClient {
-
     private static final int SERVER_PORT = 5190;
     private BufferedReader in;
     private PrintWriter out;
-    private JFrame frame = new JFrame("Chat World");
-    private JTextArea display = new JTextArea(30, 50);
-    private JTextField inputText = new JTextField(50);
-    
-    private void sendMessage() {
-        //send messages to the server
-        out.println(inputText.getText());
-        inputText.setText("");
-    }
-    
+    private final JFrame frame = new JFrame("Mind Rush");
+    private JTextArea display = new JTextArea(20, 50);
+    private JLabel questionLabel = new JLabel("Waiting for question...");
+    private JButton choiceA = new JButton("A");
+    private JButton choiceB = new JButton("B");
+    private JButton choiceC = new JButton("C");
+    private JButton choiceD = new JButton("D");
+    private JLabel scoreLabel = new JLabel("Score: 0");
+    private final JButton startButton = new JButton("Start Quiz");
+
     public MindRushClient(String serverAddr, String username) throws IOException {
-        // Network setup to server
         Socket socket = new Socket(serverAddr, SERVER_PORT);
-        //Sets up client socket to commuincate with server
-        
         in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
         out = new PrintWriter(socket.getOutputStream(), true);
-        // Send the username to the server
         out.println(username);
-        //make sure different line as message
-        
-        // Setup GUI components
-        JButton sendButton = new JButton("Send");
-        inputText.setEditable(true);
+
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setLayout(new BorderLayout());
+
+        JPanel questionPanel = new JPanel();
+        questionPanel.setLayout(new BorderLayout());
+        questionPanel.add(questionLabel, BorderLayout.CENTER);
+        questionPanel.add(scoreLabel, BorderLayout.EAST);
+        frame.add(questionPanel, BorderLayout.NORTH);
+
+        JPanel choicesPanel = new JPanel();
+        choicesPanel.setLayout(new GridLayout(2, 2));
+        choicesPanel.add(choiceA);
+        choicesPanel.add(choiceB);
+        choicesPanel.add(choiceC);
+        choicesPanel.add(choiceD);
+        frame.add(choicesPanel, BorderLayout.CENTER);
+
+        JPanel bottom = new JPanel();
+        bottom.setLayout(new FlowLayout());
+        bottom.add(new JScrollPane(display));
+        bottom.add(startButton);
+        frame.add(bottom, BorderLayout.SOUTH);
+
+        startButton.addActionListener(e -> {
+            out.println("START_CLICKED");
+            display.append("Game start!\n");
+        });
+
         display.setEditable(false);
-        frame.getContentPane().add(inputText, BorderLayout.SOUTH);
-        frame.getContentPane().add(new JScrollPane(display), BorderLayout.CENTER);
-        frame.getContentPane().add(sendButton, BorderLayout.EAST);
+
         frame.pack();
+        frame.setVisible(true);
 
-        // Add action listeners
-       
-         sendButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                sendMessage();
-            }
-        });
+        choiceA.addActionListener(e -> out.println("0"));
+        choiceB.addActionListener(e -> out.println("1"));
+        choiceC.addActionListener(e -> out.println("2"));
+        choiceD.addActionListener(e -> out.println("3"));
 
-        inputText.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                sendMessage();
-            }
-        });
-
-        // Add background thread to listen for messages from the server
-        Runnable runnable = new Runnable() {
-            public void run() {
-                try {
-                    while (true) {
-                        String line = in.readLine();
-                        if (line == null) {
-                            break;
+        new Thread(() -> {
+            try {
+                String line;
+                while ((line = in.readLine()) != null) {
+                    System.out.println("Received message: " + line);
+                    if (line.startsWith("QUESTION:")) {
+                        // Parse question and choices
+                        String[] parts = line.substring(9).split(";");
+                        if (parts.length == 5) {
+                            final String questionText = parts[0];
+                            final String[] choices = new String[] { parts[1], parts[2], parts[3], parts[4] };
+                            SwingUtilities.invokeLater(() -> {
+                                questionLabel.setText(questionText);
+                                choiceA.setText(choices[0]);
+                                choiceB.setText(choices[1]);
+                                choiceC.setText(choices[2]);
+                                choiceD.setText(choices[3]);
+                            });
+                        } else {
+                            System.err.println("Invalid QUESTION format: " + line);
                         }
-                        display.append(line + "\n");
+                    } else if (line.startsWith("SCORE:")) {
+                        // Update score
+                        final String score = line.substring(6);
+                        SwingUtilities.invokeLater(() -> {
+                            scoreLabel.setText("Score: " + score);
+                        });
+                    } else {
+                        // Log other messages
+                        final String message = line;
+                        SwingUtilities.invokeLater(() -> {
+                            display.append(message + "\n");
+                        });
                     }
-                } catch (IOException ex) {
-                    ex.printStackTrace();
                 }
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-        };
-       Thread thread = new Thread(runnable);
-       thread.start();
+        }).start();
     }
 
     public static void main(String[] args) throws Exception {
@@ -89,9 +107,6 @@ public class MindRushClient {
                 "Enter IP Address of the Server:", "localhost");
         String username = JOptionPane.showInputDialog(
                 "Enter your username:");
-
-        HW3Client client = new HW3Client(serverAddr, username);
-        client.frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        client.frame.setVisible(true);
+        new MindRushClient(serverAddr, username);
     }
 }
