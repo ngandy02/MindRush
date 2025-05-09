@@ -6,7 +6,7 @@ public class MindRushServer {
     private static final int PORT = 5190;
     private static Set<ClientHandler> clients = Collections.synchronizedSet(new HashSet<>());
     private static HashMap<Integer, Integer>[] currentQuiz = new HashMap[5];
-    private static final HashMap<String, Integer> correctAnswers =  new HashMap<>();
+    private static final HashMap<String, Integer> correctAnswers = new HashMap<>();
     private static final HashMap<String, String[]> quizMap = new HashMap<>();
     private static List<Integer> questionIndexes;
     private static boolean startPlay = false;
@@ -14,9 +14,21 @@ public class MindRushServer {
     private static List<String> questionKeys;
     private static String current_question;
 
-
     public static void main(String[] args) throws IOException {
+        initializeQuizData();
 
+        ServerSocket serverSocket = new ServerSocket(PORT);
+        System.out.println("Server started on port " + PORT);
+
+        while (true) {
+            Socket socket = serverSocket.accept();
+            ClientHandler handler = new ClientHandler(socket);
+            clients.add(handler);
+            handler.start();
+        }
+    }
+
+    private static void initializeQuizData() {
         quizMap.put("What is the capital of France?", new String[]{"Rome", "London", "Paris", "Berlin"});
         quizMap.put("What is the capital of Germany?", new String[]{"Frankfurt", "Munich", "Berlin", "Hamburg"});
         quizMap.put("What is the capital of Italy?", new String[]{"Venice", "Milan", "Rome", "Florence"});
@@ -57,7 +69,7 @@ public class MindRushServer {
         quizMap.put("What is the capital of Egypt?", new String[]{"Cairo", "Alexandria", "Giza", "Luxor"});
         quizMap.put("What is the largest organ in the human body?", new String[]{"Heart", "Liver", "Skin", "Lungs"});
         quizMap.put("What is the capital of India?", new String[]{"Mumbai", "Delhi", "New Delhi", "Kolkata"});
-
+        
         correctAnswers.put("What is the capital of France?", 2);
         correctAnswers.put("What is the capital of Germany?", 2);
         correctAnswers.put("What is the capital of Italy?", 2);
@@ -98,42 +110,6 @@ public class MindRushServer {
         correctAnswers.put("What is the capital of Egypt?", 0);
         correctAnswers.put("What is the largest organ in the human body?", 2);
         correctAnswers.put("What is the capital of India?", 2);
-        
-        List<String> questionKeys = new ArrayList<>(correctAnswers.keySet());
-
-        for (int i = 0; i < 5; i++) {
-            currentQuiz[i] = new HashMap<>();
-        }
-        ServerSocket serverSocket = new ServerSocket(PORT);      
-
-        while (true) {
-            Socket socket = serverSocket.accept();
-            ClientHandler handler = new ClientHandler(socket); // connection for this new client
-            clients.add(handler);
-            handler.start();
-            if (startPlay) {
-                startPlay = false;
-                playing = true;
-                Thread countdownThread = new Thread(() -> {
-                    try {
-                        for (int i = 0; i < 5; i++) {
-                            current_question = questionKeys.get(questionIndexes.get(i));
-                            broadcast("QUESTION:" + current_question + ";" + String.join(";", quizMap.get(current_question)));
-                            Thread.sleep(30000);
-                        }
-                        for (ClientHandler client : clients) {
-                            broadcast(client.getScore());
-                        }
-                        playing = false;
-                    }
-                    catch (InterruptedException e) {
-                        System.out.println("Countdown interrupted");
-                    }
-                });
-                countdownThread.start();
-            }
-        }
-
     }
 
     private static void broadcast(String message) {
@@ -155,48 +131,61 @@ public class MindRushServer {
             this.socket = socket;
         }
 
-        public void run() { // runs when the thread starts
+        public void run() {
             try {
                 in = new Scanner(socket.getInputStream());
                 out = new PrintStream(socket.getOutputStream(), true);
 
-                String message;
-
                 correct = 0;
-
                 username = in.nextLine();
 
                 Random random = new Random();
-                
+
                 while (in.hasNextLine()) {
-                    if (!playing) {
-                        message = in.nextLine();
-                        if (message.equals("START_CLICKED")) {
-                            // Set questions for this quiz
-                            questionIndexes = new ArrayList<>();
-                            for (int i = 0; i < 5; i++) {
-                                questionIndexes.add(random.nextInt(40));
-                            }
-                            startPlay = true;
+                    String message = in.nextLine();
+                    if (message.equals("START_CLICKED")) {
+                        System.out.println("Received start from client!");
+                        questionIndexes = new ArrayList<>();
+                        for (int i = 0; i < 5; i++) {
+                            questionIndexes.add(random.nextInt(40));
                         }
-                    }
-                    else { // If the input is an answer being given
-                        if (correctAnswers.get(current_question) == Integer.parseInt(in.nextLine())) {
+                        startPlay = true;
+                        playing = true;
+                        new Thread(() -> {
+                            try {
+                                for (int i = 0; i < 5; i++) {
+                                    current_question = questionKeys.get(questionIndexes.get(i));
+                                    System.out.println("Broadcasting question: " + current_question);
+                                    broadcast("QUESTION:" + current_question + ";" + String.join(";", quizMap.get(current_question)));
+                                    Thread.sleep(30000);
+                                }
+                                for (ClientHandler client : clients) {
+                                    broadcast("SCORE:" + client.getScore());
+                                }
+                                playing = false;
+                            } catch (InterruptedException e) {
+                                System.out.println("Countdown interrupted");
+                            }
+                        }).start();
+                    } else if (playing) {
+                        if (correctAnswers.get(current_question) == Integer.parseInt(message)) {
                             correct++;
                         }
                     }
                 }
             } catch (IOException e) {
-                // failed
+                System.err.println("Client disconnected: " + e.getMessage());
             } finally {
                 try {
                     socket.close();
-                } catch (IOException e) {}
+                } catch (IOException e) {
+                    System.err.println("Error closing socket: " + e.getMessage());
+                }
             }
         }
 
         public String getScore() {
-            return (username + correct);
+            return username + ":" + correct;
         }
     }
 }
