@@ -162,7 +162,7 @@ public class MindRushServer {
                                     current_question = questionKeys.get(questionIndexes.get(i));
                                     System.out.println("Broadcasting question: " + current_question);
                                     broadcast("QUESTION:" + current_question + ";" + String.join(";", quizMap.get(current_question)));
-                                    Thread.sleep(30000);
+                                    Thread.sleep(15000);
                                 }
                                 for (ClientHandler client : clients) {
                                     broadcast("SCORE:" + client.getScore());
